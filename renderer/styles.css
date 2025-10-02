@@ -1,0 +1,187 @@
+/* General layout */
+body {
+  margin: 0;
+  background: rgba(30, 30, 30, 0.95);
+  color: white;
+  font-family: sans-serif;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding: 20px;
+}
+
+/* Main radio/player container */
+.radio {
+  width: 100%;
+  max-width: 480px;
+  background: #1a1a1a;
+  border-radius: 20px;
+  box-shadow: 0 6px 16px rgba(0,0,0,0.6);
+  overflow: hidden;
+  padding: 20px;
+}
+
+/* Title bar inside player */
+.title-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-weight: bold;
+  margin-bottom: 10px;
+  -webkit-app-region: drag;
+}
+
+.window-controls button {
+    -webkit-app-region: no-drag;
+    background: transparent;
+    color: white;
+    border: none;
+    cursor: pointer;
+    padding: 0 10px;
+    font-size: 16px;
+}
+
+.title-bar .title {
+  font-size: 1.2rem;
+}
+
+/* Window controls inside player */
+.window-controls {
+  display: flex;
+}
+.window-controls .btn {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  font-size: 1rem;
+}
+
+/* Display / now playing */
+.display {
+  background: #2a2a2a;
+  padding: 12px;
+  border-radius: 12px;
+  text-align: center;
+  margin-bottom: 15px;
+  font-size: 1rem;
+}
+
+/* Utility buttons */
+.buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: center;
+  margin-bottom: 15px;
+}
+.buttons button {
+  flex: 1 1 40%;
+  background: #444;
+  border: none;
+  border-radius: 14px;
+  padding: 12px;
+  font-size: 1rem;
+  color: white;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.buttons button:hover {
+  background: #666;
+}
+
+/* Status text */
+.status {
+  text-align: center;
+  font-size: 0.9rem;
+  margin: 10px 0;
+  color: #aaa;
+}
+
+/* Song list */
+.songList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 150px;
+  overflow-y: auto;
+  background: #222;
+  border-radius: 12px;
+}
+.songList li {
+  padding: 10px;
+  border-bottom: 1px solid #333;
+  cursor: pointer;
+}
+.songList li:hover {
+  background: #333;
+}
+
+/* Progress bar */
+.progress-container {
+  width: 100%;
+  height: 12px;
+  background: #333;
+  border-radius: 6px;
+  margin: 15px 0;
+  cursor: pointer;
+}
+.progress {
+  height: 100%;
+  width: 0;
+  background: #1db954; /* Spotify green style */
+  border-radius: 6px;
+  transition: width 0.2s;
+}
+
+/* Time display */
+.time-display {
+  text-align: center;
+  font-size: 0.9rem;
+  margin-bottom: 10px;
+}
+
+/* Playback controls */
+.controls {
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+  margin-top: 15px;
+}
+
+/* Large round control buttons */
+.controls .btn {
+  width: 70px;
+  height: 70px;
+  border-radius: 50%;
+  background: #444;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  cursor: pointer;
+  transition: background 0.2s, transform 0.1s;
+}
+.controls .btn:hover {
+  background: #666;
+  transform: scale(1.05);
+}
+.controls .btn svg {
+  fill: white;
+  width: 32px;
+  height: 32px;
+}
+
+/* Dropdown styling */
+#authorDropdown select {
+  background: #333;
+  color: white;
+  border: none;
+  padding: 10px;
+  border-radius: 12px;
+  font-size: 1rem;
+  cursor: pointer;
+}
+#authorDropdown select:focus {
+  outline: none;
+  background: #444;
+}
+

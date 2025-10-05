@@ -19,7 +19,9 @@
     "electron-builder": "^24.13.3"
   },
   "dependencies": {
-    "electronmon": "^2.0.3"
+    "chokidar": "^4.0.3",
+    "electronmon": "^2.0.3",
+    "music-metadata": "^11.9.0"
   },
   "build": {
     "appId": "com.example.pi-music-2025",
@@ -30,7 +32,10 @@
       "package.json"
     ],
     "linux": {
-      "target": ["deb", "AppImage"],
+      "target": [
+        "deb",
+        "AppImage"
+      ],
       "category": "Utility",
       "maintainer": "davepol",
       "synopsis": "Music player for Raspberry Pi",
@@ -39,4 +44,3 @@
     }
   }
 }
-

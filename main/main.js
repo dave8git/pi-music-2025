@@ -18,7 +18,9 @@ const getFsPromises = lazyLoadModule('fs/promises');
 const getPath = lazyLoadModule('path');
 const getOs = lazyLoadModule('os');
 const getElectron = lazyLoadModule('electron');
-
+const getChokidar = lazyLoadModule('chokidar');
+const getMusicMetadata = lazyLoadModule('music-metadata');
+let watcher = null;
 // Poniższe gettery to trochę overkill, bo takie rzeczy jak electron, browserWindow będę potrzebne praktycznie od razu (a tutaj przez gettery są opóźnione), ale aby sie nauczyć zrobie to tak :)
 function getApp() {
     const electron = getElectron();
@@ -69,6 +71,29 @@ function createWindow() {
     mainWindow.webContents.openDevTools();
     const parentPathRenderer = path.dirname(__dirname); // parentPath will be parent of /main directory so, root directory. 
     mainWindow.loadFile(path.join(parentPathRenderer, 'renderer', 'index.html'));
+}
+
+function isRaspberryPi() {
+    const os = getOs();
+    const fs = getFs();
+
+    if (!os) {
+        console.error('Required modules missing!');
+        return null;
+    }
+
+    const platform = os.platform();
+    const arch = os.arch();
+
+    if (platform === 'linux' && (arch === 'arm' || arch === 'arm64')) {
+        try {
+            const cpuInfo = fs.readFileSync('/proc/cpuinfo', 'utf8');
+            return cpuInfo.includes('Raspberry PI') || cpuInfo.includes('BCM');
+        } catch (err) {
+            return true;
+        }
+    }
+    return false;
 }
 
 function setupWindowControlIPC() {
@@ -138,7 +163,7 @@ async function musicLocation() {
                     selectedFolder = chosenPath;
                 } else {
                     const newFolderName = path.join(chosenPath, 'music_folder');
-                    fsSync.mkdirSync(newFolderName, { recursive: true });
+                    fs.mkdirSync(newFolderName, { recursive: true });
                     selectedFolder = chosenPath;
                 }
             }
@@ -149,14 +174,81 @@ async function musicLocation() {
     return selectedFolder;
 }
 
+const isWindows = getOs()?.platform() === 'win32';
+const isRPi = isRaspberryPi();
+
+let debounceTimer = null;
+let pendingEvents = [];
+
+function triggerUpdate(type, filePath) {
+    pendingEvents.push({ type, path: filePath });
+
+    if (debounceTimer) clearTimeout;
+
+    debounceTimer = setTimeout(() => {
+        if (mainWindow && !mainWindow.isDestroyed()) {
+            console.log('Sending event to renderer:', pendingEvents);
+            mainWindow.webContents.send('music-events', pendingEvents);
+        }
+        pendingEvents = [];
+    }, 300);
+}
+
+function startWatching(folderPath, isRPi) {
+    const chokidar = getChokidar();
+
+    if (!chokidar) {
+        console.error('Required modules missing!');
+        return null;
+    }
+    
+    if (watcher) {
+        console.log('Closing previous watcher...');
+        watcher.close();
+        watcher = null;
+    }
+
+    const options = {
+        persistent: true,
+        ignoreInitial: true,
+        ignored: /(^|[\/\\])\../,
+        depth: 0,
+    }
+
+    watcher = getChokidar().watch(folderPath, options);
+
+    if (isRPi) {
+        options.usePolling = true;
+        options.interval = 2000;
+        options.binaryInterval = 5000;
+    } else {
+        options.usePolling = false;
+    }
+
+    watcher
+        .on('add', path => triggerUpdate('add', path))
+        .on('change', path => triggerUpdate('change', path))
+        .on('unlink', path => triggerUpdate('unlink', path));
+
+    return watcher;
+}
+
 function startApp() {
     const app = getApp()
+    const BrowserWindow = getBrowserWindow();
     if (!app) throw new Error('Electron app module missing!');
+    if (!BrowserWindow) throw new Error('Electron browserwindow module missing!');
     app.whenReady().then(async () => {
         console.log('whenReady');
-        await musicLocation();
+        const folder = await musicLocation();
         createWindow();
         setupWindowControlIPC();
+        if(folder) {
+            console.log('Starting watcher on:', folder);
+            startWatching(folder, isRPi);
+        } else {
+            console.warn('No music folder selected. Watcher not started');
+        }
     }).catch((err) => {
         console.error('Application failed, sorry!', err);
     }); // app.whenReady() --> app will start only after electron finishes initializing everything like: loading native modules, setting up main process, read the app resources (pictures, music, disk files etc.)

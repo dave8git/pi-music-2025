@@ -4,10 +4,7 @@ const { app, BrowserWindow, ipcMain, dialog } = require('electron'); // app --> 
 //ipcMain: Handles communication from renderer processes (frontend) to main process.
 //Menu: Create custom application menus.
 //dialog: Open native system dialogs (file pickers, alerts, etc.).
-const path = require('path');
-const fs = require('fs/promises');
-const fsSync = require('fs');
-const os = require("os");
+const path = loadModuleIfExist("path");
 const parentPathPreload = path.dirname(__dirname);
 const preloadPath = path.join(parentPathPreload, 'preload', 'preload.js')
 let mainWindow;
@@ -32,6 +29,24 @@ function createWindow() {
     mainWindow.loadFile(path.join(parentPathRenderer, 'renderer', 'index.html'));
 }
 
+function loadModuleIfExist(moduleName) {
+    try {
+        // Resolve the module path in Node's cache
+        const resolvedPath = require.resolve(moduleName);
+
+        // If module is already loaded, return it from cache
+        if (require.cache[resolvedPath]) {
+            return require.cache[resolvedPath].exports;
+        }
+
+        // Otherwise, require it and return
+        return require(moduleName);
+    } catch (err) {
+        console.error(`Failed to load module "${moduleName}":`, err);
+        return null; // never return undefined silently
+    }
+}
+
 ipcMain.on('window-control', (event, action) => { // function to control window clozing, mazimizeing and minimizing
     switch (action) {
         case 'minimize':
@@ -50,18 +65,16 @@ ipcMain.on('window-control', (event, action) => { // function to control window 
     }
 })
 
+const os = loadModuleIfExist("os");
 const homeDir = os.homedir();
 const homePath = path.join(homeDir, 'Downloads', 'music_folder');
 let selectedFolder = null;
-console.log('homeDir', homeDir);
-console.log('homePath', homePath);
 
 async function musicFilesExists(directoryPath) {
+    const fsPromise = loadModuleIfExist("fs/promise");
     try {
-        const directoryFiles = await fs.readdir(directoryPath);
-        console.log('directoryFiles', directoryFiles);
+        const directoryFiles = await fsPromise.readdir(directoryPath);
         const mp3files = directoryFiles.filter(file => file.toLowerCase().endsWith(".mp3"));
-        console.log('mp3files', mp3files);
         return mp3files.length > 0;
     } catch {
         return false;
@@ -69,8 +82,9 @@ async function musicFilesExists(directoryPath) {
 }
 
 async function musicLocation() {
+    const fs = loadModuleIfExist('fs');
     try {
-        if (fsSync.existsSync(homePath) && fsSync.lstatSync(homePath).isDirectory()) {
+        if (fs.existsSync(homePath) && fs.lstatSync(homePath).isDirectory()) {
             if (await musicFilesExists(homePath)) {
                 selectedFolder = homePath;
             }
@@ -79,7 +93,7 @@ async function musicLocation() {
                 properties: ['openDirectory'],
             });
             if(!result.canceled && result.filePaths.length > 0){
-                const chosenPath = result.filePaths[0]; 
+                const chosenPath = result.filePaths[0];
                 if (await musicFilesExists(chosenPath)) {
                     selectedFolder = chosenPath;
                 } else {

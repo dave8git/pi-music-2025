@@ -6,16 +6,37 @@
   "scripts": {
     "start": "electron .",
     "dev": "electronmon .",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "pack": "electron-builder --dir",
+    "dist": "electron-builder --linux --armv7l",
+    "dist:arm64": "electron-builder --linux --arm64"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "type": "commonjs",
   "devDependencies": {
-    "electron": "^38.1.2"
+    "electron": "^38.1.2",
+    "electron-builder": "^24.13.3"
   },
   "dependencies": {
     "electronmon": "^2.0.3"
+  },
+  "build": {
+    "appId": "com.example.pi-music-2025",
+    "productName": "Pi Music",
+    "files": [
+      "main/**/*",
+      "renderer/**/*",
+      "package.json"
+    ],
+    "linux": {
+      "target": ["deb", "AppImage"],
+      "category": "Utility",
+      "maintainer": "davepol",
+      "synopsis": "Music player for Raspberry Pi",
+      "description": "A simple music app for Raspberry Pi",
+      "icon": "assets/icons"
+    }
   }
 }
+

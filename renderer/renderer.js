@@ -5,29 +5,50 @@ const progressContainer = document.getElementById('progressContainer');
 const currentTimeEl = document.getElementById('currentTime');
 const totalTimeEl = document.getElementById('totalTime');
 const uploadStatus = document.getElementById('status');
-const authorSelect = document.getElementById('authorSelect');
 const playBtn = document.getElementById('playBtn');
 
+let artistWindow = null;
+
 document.getElementById('authors').addEventListener('click', () => {
-  const child = window.open(
+  if(artistWindow && !artistWindow.closed) {
+    artistWindow.focus();
+    return;
+  }
+
+  artistWindow = window.open(
     './authors.html',
     'authorsWindow',
     'width=480,height=320,resizable=yes'
   );
-
-  child.addEventListener('load', () => {
-    setInterval(() => {
-      child.console.log("interval");
-      child.postMessage("Hello", "*")
-    }, 2000
-    )
-  });
-})
-window.addEventListener('message', (event) => {
-  console.log('event', event);
 });
 
+window.addEventListener('message', (event) => {
+  if(event.data.type === 'request-artists') {
+    if (artistWindow && !artistWindow.closed) {
+      const artists = [...new Set(allSongs.map(song => song.artist))]
+      artistWindow.postMessage({
+        type: 'artists',
+        artists: artists
+      }, '*');
+    }
+  } else if (event.data.type === 'artist-selected') {
+    const selectedArtist = event.data.artist;
+    currentFilter = selectedArtist;
+    currentSongs = getFilteredSongs();
+    console.log(`Filtered to artist: ${selectedArtist}, ${currentSongs.length} songs`);
 
+    currentIndex = -1;
+    audioPlayer.pause();
+    audioPlayer.src = '';
+    updatePlayIcon(false);
+
+    if(selectedArtist === 'all') {
+      updateNowPlayingDisplayAdvanced('All Artist - Ready to play');
+    } else {
+      updateNowPlayingDisplayAdvanced(`${selectedArtist} - ${currentSongs.length} songs`);
+    }
+  }
+});
 
 audioPlayer.addEventListener('timeupdate', () => {
   const now = Date.now();
@@ -53,12 +74,12 @@ progressContainer.addEventListener('click', (e) => {
   }
 });
 
-authorSelect.addEventListener("change", (e) => {
-  const selectedValue = authorSelect.value;
-  currentFilter = selectedValue;
-  currentSongs = getFilteredSongs();
-  displaySongs(currentSongs);
-})
+// authorSelect.addEventListener("change", (e) => {
+//   const selectedValue = authorSelect.value;
+//   currentFilter = selectedValue;
+//   currentSongs = getFilteredSongs();
+//   displaySongs(currentSongs);
+// })
 
 let allSongs = [];
 let currentIndex = -1;
@@ -104,23 +125,23 @@ audioPlayer.addEventListener('ended', () => {
   }
 });
 
-document.querySelectorAll('.controls .btn')[0].addEventListener('click', playPrev);
-document.querySelectorAll('.controls .btn')[1].addEventListener('click', togglePlayPause);
-document.querySelectorAll('.controls .btn')[2].addEventListener('click', playNext);
+document.querySelectorAll('.controls .btn')[1].addEventListener('click', playPrev);
+document.querySelectorAll('.controls .btn')[2].addEventListener('click', togglePlayPause);
+document.querySelectorAll('.controls .btn')[3].addEventListener('click', playNext);
 
-function populateAuthorDropdown(songs) {
-  const artists = [...new Set(songs.map(song => song.artist))];
-  const fragment = document.createDocumentFragment();
-  authorSelect.innerHTML = `<option value="all">All Authors</option>`;
+// function populateAuthorDropdown(songs) {
+//   const artists = [...new Set(songs.map(song => song.artist))];
+//   const fragment = document.createDocumentFragment();
+//   authorSelect.innerHTML = `<option value="all">All Authors</option>`;
 
-  artists.forEach(author => {
-    const option = document.createElement("option");
-    option.value = author;
-    option.textContent = author;
-    fragment.appendChild(option);
-  });
-  authorSelect.appendChild(fragment);
-}
+//   artists.forEach(author => {
+//     const option = document.createElement("option");
+//     option.value = author;
+//     option.textContent = author;
+//     fragment.appendChild(option);
+//   });
+//   authorSelect.appendChild(fragment);
+// }
 
 async function playSong(index) {
   if (index < 0 || index >= currentSongs.length) return;
@@ -269,7 +290,6 @@ async function loadAllFiles() {
     console.log('Loading all songs...')
     const songs = await window.electronAPI.loadAllFiles();
     allSongs = songs;
-    populateAuthorDropdown(allSongs);
     currentSongs = getFilteredSongs();
     console.log(`Loaded ${allSongs.length} songs:`, allSongs);
     return songs;

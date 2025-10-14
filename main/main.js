@@ -1,26 +1,6 @@
-function lazyLoadModule(moduleName) {
-    let cachedModule = undefined;
-    return function getModule() {
-        if (cachedModule !== undefined) return cachedModule;
-        try {
-            cachedModule = require(moduleName);
-            return cachedModule;
-        } catch (err) {
-            console.error(`Lazy-load failed for module "${moduleName}":`, err);
-            cachedModule = null;
-            return null
-        }
-    };
-}
-
-const getFs = lazyLoadModule('fs'); // tutaj moduł fs jeszcze nie jest ładowany, zwrocona jest funkcja getFs i to ona wywoła require('fs') później, kiedy będzie potrzebne. 
-const getFsPromises = lazyLoadModule('fs/promises');
-const getPath = lazyLoadModule('path');
-const getOs = lazyLoadModule('os');
-const getElectron = lazyLoadModule('electron');
-const getChokidar = lazyLoadModule('chokidar');
-const getMusicMetadata = lazyLoadModule('music-metadata');
+const { getFs, getFsPromises, getPath, getOs, getElectron, getChokidar, getMusicMetadata, getUrl } = require("./modules");
 let watcher = null;
+const metadataCache = new Map();
 // Poniższe gettery to trochę overkill, bo takie rzeczy jak electron, browserWindow będę potrzebne praktycznie od razu (a tutaj przez gettery są opóźnione), ale aby sie nauczyć zrobie to tak :)
 function getApp() {
     const electron = getElectron();
@@ -42,6 +22,11 @@ function getDialog() {
     return electron?.dialog || null;
 }
 
+function getFileURLToPath() {
+    const url = getUrl();
+    return url?.fileURLToPath || null;
+}
+
 let mainWindow;
 let selectedFolder = null;
 
@@ -55,8 +40,8 @@ function createWindow() {
     const preloadPath = path.join(parentPathPreload, 'preload', 'preload.js');
 
     mainWindow = new BrowserWindow({
-        width: 800,
-        height: 600,
+        width: 480,
+        height: 320,
         frame: false,
         transparent: true, // window background transparent
         resizable: true,
@@ -122,13 +107,13 @@ function setupWindowControlIPC() {
 
 // const os = loadModuleIfExist("os");
 
-async function musicFilesExists(directoryPath) {
+async function musicFilesExists(directoryPath) { // async - tworzy obietnice, i każda kolejna obietnica zwraca obietnice  - aby zwrócić wartość, obietnica musi być rozwiązana (wywołanie funkcji)
     const fsPromise = getFsPromises();
     if (!fsPromise) return false;
     try {
         const directoryFiles = await fsPromise.readdir(directoryPath);
         const mp3files = directoryFiles.filter(file => file.toLowerCase().endsWith(".mp3"));
-        return mp3files.length > 0;
+        return mp3files.length > 0; // jeżeli są pliki - zwraca obietnice która zwróci true albo false // funkcje asynchroniczne zawsze zwaracają obietnice
     } catch {
         return false;
     }
@@ -150,7 +135,7 @@ async function musicLocation() {
 
     try {
         if (fs.existsSync(homePath) && fs.lstatSync(homePath).isDirectory()) {
-            if (await musicFilesExists(homePath)) {
+            if (await musicFilesExists(homePath)) { // await rozwiązuje obietnicę
                 selectedFolder = homePath;
             }
         } else {
@@ -183,7 +168,7 @@ let pendingEvents = [];
 function triggerUpdate(type, filePath) {
     pendingEvents.push({ type, path: filePath });
 
-    if (debounceTimer) clearTimeout;
+    if (debounceTimer) clearTimeout(debounceTimer);
 
     debounceTimer = setTimeout(() => {
         if (mainWindow && !mainWindow.isDestroyed()) {
@@ -201,7 +186,7 @@ function startWatching(folderPath, isRPi) {
         console.error('Required modules missing!');
         return null;
     }
-    
+
     if (watcher) {
         console.log('Closing previous watcher...');
         watcher.close();
@@ -233,6 +218,169 @@ function startWatching(folderPath, isRPi) {
     return watcher;
 }
 
+async function readMetadata(filePath, retries = 3, delay = 200) {
+    const path = require('path');
+    const fileName = path.basename(filePath);
+
+    if (metadataCache.has(fileName)) {
+        return metadataCache.get(fileName) // jeżeli metadane z tego pliku sa juz w cache'u to pobierze metadate z cache'u
+    }
+
+    const musicMetadata = getMusicMetadata()
+
+    for (let i = 0; i < retries; i++) {
+        try {
+            const metadata = await musicMetadata.parseFile(filePath);
+            metadataCache.set(fileName, metadata);
+            return metadata;
+        } catch (err) {
+            if (err.code === 'EBUSY' || err.code === 'ENOENT') {
+                await new Promise(res => setTimeout(res, delay)); // jezeli trwaja operacje dyskowe przedłuż o delay podany w parametrze
+            } else {
+                throw err;
+            }
+        }
+    }
+    throw new Error(`Failed to parse file after ${retries} retries: ${filePath}`);
+}
+
+
+let MUSIC_FOLDER;
+
+
+const audioCache = new Map();
+const MAX_AUDIO_CACHE_SIZE = 5;
+
+function setupFileHandlers() {
+    const ipcMain = getIpcMain();
+    if (!ipcMain) return;
+
+    ipcMain.handle('upload-mp3-files', async () => {
+        const dialog = getDialog();
+        const fs = getFs();
+        const path = getPath();
+
+        if(!mainWindow) return []; // musimy sprawdzić czy mainWindow istnieje, jeżeli nie to nie pokaże też dialogu
+
+        const result = await dialog.showOpenDialog(mainWindow, { // result będzie obiektem i będzie miało dwie właściwości: canceled oraz filePaths.
+            properties: ['openFile', 'multiSelections'],
+            filters: [{ name: 'MP3 Files', extensions: ['mp3']}],
+        });
+
+        if (result.canceled) return [];
+        const uploadedFiles = [];
+
+        const batchSize = 5;
+        for (let i = 0; i < result.filePaths.length; i += batchSize) {
+            const batch = result.filePaths.slice(i, i + batchSize);
+
+            for(const filePath of batch) {
+                try {
+                    const fileName = path.basename(filePath);
+                    const destinationPath = path.join(MUSIC_FOLDER, fileName);
+
+                    if(fs.existsSync(destinationPath)) {
+                        console.log(`File ${fileName} already exists, skipping`);
+                        continue;
+                    }
+
+                    await fs.promises.copyFile(filePath, destinationPath);
+                    console.log(`Uploaded: ${fileName}`);
+                    uploadedFiles.push(fileName);
+                    metadataCache.delete(fileName);
+                } catch (err) {
+                    console.error(`Error uploading ${filePath}:`, err);
+                }
+            }
+
+            if(i + batchSize < result.filePaths.length) { // wstawia niewielkie przerwy pomiedzy batchami
+                await new Promise(resolve => setTimeout(resolve, 10));
+            }
+        }
+        return uploadedFiles;
+    })
+
+    ipcMain.handle('load-all-files', async () => {
+        const fs = getFs();
+        const path = getPath();
+        const { pathToFileURL } = require('url');
+        try {
+            const files = await fs.promises.readdir(MUSIC_FOLDER);
+            const mp3Files = files.filter(file => file.toLowerCase().endsWith('.mp3'));
+            const metadataArray = [];
+            const { pathToFileURL } = require('url');
+
+            const batchSize = 10;
+            for (let i = 0; i < mp3Files.length; i += batchSize) {
+                const batch = mp3Files.slice(i, i + batchSize);
+
+                await Promise.all(batch.map(async (fileName) => {
+                    const filePath = path.join(MUSIC_FOLDER, fileName);
+                    try {
+                        const metadata = await readMetadata(filePath);
+                        metadataArray.push({
+                            filePath: pathToFileURL(filePath).toString(),
+                            fileName,
+                            title: metadata.common.title || path.basename(fileName, '.mp3'),
+                            artist: metadata.common.artist || 'Uknown Artist',
+                            album: metadata.common.album || 'Unknown Album',
+                            year: metadata.common.year || '',
+                            duration: metadata.format.duration || 0,
+                        });
+                    } catch (err) {
+                        console.error(`Error reading metadata for $(fileName):`, err);
+                        metadataArray.push({
+                            filePath: pathToFileURL(filePath).toString(),
+                            fileName,
+                            title: path.basename(fileName, '.mp3'),
+                            artist: 'Unknown Artist',
+                            album: 'Uknown Album',
+                            year: '',
+                            duration: 0
+                        });
+                    }
+                }));
+                if (i + batchSize < mp3Files.length) {
+                    await new Promise(resolve => setTimeout(resolve, 5));
+                }
+            }
+            return metadataArray;
+        } catch (err) {
+            console.error('Error reading music folder:', err);
+            return [];
+        }
+    });
+
+    ipcMain.handle('load-audio', async (_, fileUrl) => {
+        const fs = getFs();
+        const path = getPath();
+        const fileURLToPath = getFileURLToPath();
+
+        try {
+            const filePath = fileURLToPath(fileUrl);
+            if (audioCache.has(filePath)) {
+                console.log('✓ Cache HIT:', path.basename(filePath));
+                return audioCache.get(filePath);
+            }
+            console.log('✗ Cache MISS:', path.basename(filePath), '- Reading from disk...');
+            const data = await fs.promises.readFile(filePath);
+            const base64Data = data.toString('base64');
+            if (audioCache.size >= MAX_AUDIO_CACHE_SIZE) {
+                const firstKey = audioCache.keys().next().value;
+                audioCache.delete(firstKey);
+                console.log('🗑️ Evicted oldest song from cache:', path.basename(firstKey));
+            }
+            //return audioData;
+            audioCache.set(filePath, base64Data);
+            console.log('💾 Cached audio:', path.basename(filePath));
+            return base64Data;
+        } catch (error) {
+            console.error('❌ Error loading audio:', error);
+            throw error;
+        }
+    });
+}
+
 function startApp() {
     const app = getApp()
     const BrowserWindow = getBrowserWindow();
@@ -241,9 +389,11 @@ function startApp() {
     app.whenReady().then(async () => {
         console.log('whenReady');
         const folder = await musicLocation();
+        MUSIC_FOLDER = folder;
         createWindow();
         setupWindowControlIPC();
-        if(folder) {
+        setupFileHandlers();
+        if (folder) {
             console.log('Starting watcher on:', folder);
             startWatching(folder, isRPi);
         } else {
@@ -251,10 +401,17 @@ function startApp() {
         }
     }).catch((err) => {
         console.error('Application failed, sorry!', err);
-    }); // app.whenReady() --> app will start only after electron finishes initializing everything like: loading native modules, setting up main process, read the app resources (pictures, music, disk files etc.)
+    });
 
     app.on('window-all-closed', () => {
-        if (process.platform !== 'darwin') app.quit();
+        if (watcher) {
+            watcher.close();
+        }
+        metadataCache.clear();
+        audioCache.clear();
+        if (process.platform !== 'darwin') {
+            app.quit();
+        }
     });
 
     app.on('activate', () => {
@@ -263,3 +420,13 @@ function startApp() {
 }
 
 startApp();
+
+
+
+// app.on('before-quit', () => {
+//     if (watcher) {
+//         watcher.close();
+//     }
+//     metadataCache.clear();
+//     audioCache.clear();
+// })

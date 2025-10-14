@@ -4,10 +4,30 @@ const progressBar = document.getElementById('progress');
 const progressContainer = document.getElementById('progressContainer');
 const currentTimeEl = document.getElementById('currentTime');
 const totalTimeEl = document.getElementById('totalTime');
-const uploadFiles = document.getElementById('uploadFiles');
 const uploadStatus = document.getElementById('status');
 const authorSelect = document.getElementById('authorSelect');
 const playBtn = document.getElementById('playBtn');
+
+document.getElementById('authors').addEventListener('click', () => {
+  const child = window.open(
+    './authors.html',
+    'authorsWindow',
+    'width=480,height=320,resizable=yes'
+  );
+
+  child.addEventListener('load', () => {
+    setInterval(() => {
+      child.console.log("interval");
+      child.postMessage("Hello", "*")
+    }, 2000
+    )
+  });
+})
+window.addEventListener('message', (event) => {
+  console.log('event', event);
+});
+
+
 
 audioPlayer.addEventListener('timeupdate', () => {
   const now = Date.now();
@@ -22,20 +42,6 @@ audioPlayer.addEventListener('timeupdate', () => {
 
 audioPlayer.addEventListener('loadedmetadata', () => {
   totalTimeEl.textContent = formatDuration(audioPlayer.duration);
-});
-
-uploadFiles.addEventListener('click', async () => {
-  try {
-    const uploadedFiles = await window.electronAPI.uploadMp3Files();
-    if (uploadedFiles.length > 0) {
-      showStatus(`Uploaded ${uploadedFiles.length} file(s) successfully!`);
-      await loadAllSongs();
-    } else {
-      showStatus('No files were uploaded');
-    }
-  } catch (err) {
-    showStatus('Error uploading files');
-  }
 });
 
 progressContainer.addEventListener('click', (e) => {
@@ -58,7 +64,7 @@ let allSongs = [];
 let currentIndex = -1;
 let currentFilter = "all";
 let currentSongs = [];
-const songList = document.getElementById('songList');
+//const songList = document.getElementById('songList');
 let isLoadingSong = false;
 let lastTimeUpdate = 0;
 const TIME_UPDATE_THROTTLE = 100; // Update every 100ms instead of every frame
@@ -119,20 +125,19 @@ function populateAuthorDropdown(songs) {
 async function playSong(index) {
   if (index < 0 || index >= currentSongs.length) return;
   if (isLoadingSong) return; // Prevent overlapping loads
-  
+
   isLoadingSong = true; // Set flag immediately
   currentIndex = index;
   const song = currentSongs[index];
-  
+
   try {
     const base64Audio = await window.electronAPI.loadAudio(song.filePath);
     const dataUrl = `data:audio/mpeg;base64,${base64Audio}`;
     audioPlayer.src = dataUrl;
-    
+
     try {
       await audioPlayer.play();
       updateNowPlayingDisplayAdvanced(song.title);
-      updateActiveSong();
       updatePlayIcon(true);
     } catch (playErr) {
       console.log('Playback interrupted:', playErr.message);
@@ -167,7 +172,7 @@ function playPrev() {
 }
 
 function handleSongClick(index) {
-  if (isLoadingSong) return; 
+  if (isLoadingSong) return;
   if (currentIndex === index && !audioPlayer.paused) {
     audioPlayer.pause();
     updatePlayIcon(false);
@@ -179,13 +184,13 @@ function handleSongClick(index) {
 function togglePlayPause() {
   if (currentSongs.length === 0) return;
   if (isLoadingSong) return;
-  
+
   // If no song is loaded yet, start playing the first song
   if (!audioPlayer.src || audioPlayer.src === '') {
     playSong(0);
     return;
   }
-  
+
   // If there's a song loaded, toggle play/pause
   if (audioPlayer.paused) {
     audioPlayer.play().catch(err => {
@@ -193,24 +198,6 @@ function togglePlayPause() {
     });
   } else {
     audioPlayer.pause();
-  }
-}
-
-function updateActiveSong() {
-  const allSongElements = songList.querySelectorAll('li');
-  allSongElements.forEach(li => li.classList.remove('active'));
-
-  if (currentIndex >= 0 && currentIndex < currentSongs.length) {
-    const activeSongElement = allSongElements[currentIndex];
-    if (activeSongElement) {
-      activeSongElement.classList.add('active');
-      // Use requestIdleCallback if available, fallback to setTimeout
-      if (window.requestIdleCallback) {
-        requestIdleCallback(() => scrollToActiveSongSimple());
-      } else {
-        setTimeout(scrollToActiveSongSimple, 100);
-      }
-    }
   }
 }
 
@@ -265,60 +252,9 @@ function showStatus(message, type) {
   }, 3000);
 }
 
-function displaySongs(songs) {
-  songList.innerHTML = '';
-
-  if (songs.length === 0) {
-    songList.innerHTML = '<li>No Mp3 files found in the music folder.</li>';
-    return;
-  }
-
-  const fragment = document.createDocumentFragment();
-
-  songs.forEach((song, index) => {
-    const li = document.createElement('li');
-
-    const songInfo = document.createElement('div');
-    songInfo.className = 'song-info';
-
-    const title = document.createElement('div');
-    title.className = 'song-title';
-    title.textContent = song.title;
-
-    const details = document.createElement('div');
-    details.className = 'song-details';
-    details.textContent = `${song.artist} • ${song.album} • ${formatDuration(song.duration)} • ${song.year || 'Unknown Year'} `;
-
-    const deleteBtn = document.createElement('button');
-    deleteBtn.className = 'delete-btn';
-    deleteBtn.textContent = 'x';
-
-    // Use event delegation instead of individual listeners
-    songInfo.addEventListener('click', () => handleSongClick(index));
-    deleteBtn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      deleteSong(song);
-    });
-
-    songInfo.appendChild(title);
-    songInfo.appendChild(details);
-    songInfo.classList.add('songInfo');
-
-    li.appendChild(songInfo);
-    li.appendChild(deleteBtn);
-    fragment.appendChild(li);
-  });
-
-  songList.appendChild(fragment);
-  updateActiveSong();
-  debounceResize();
-}
-
 function debounceResize() {
   // Placeholder - will implement window resizing later
 }
-
-
 
 function getFilteredSongs() {
   if (currentFilter === "all") {
@@ -335,7 +271,6 @@ async function loadAllFiles() {
     allSongs = songs;
     populateAuthorDropdown(allSongs);
     currentSongs = getFilteredSongs();
-    displaySongs(currentSongs);
     console.log(`Loaded ${allSongs.length} songs:`, allSongs);
     return songs;
   } catch (error) {

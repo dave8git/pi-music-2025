@@ -41,7 +41,7 @@ function createWindow() {
 
     mainWindow = new BrowserWindow({
         width: 480,
-        height: 320,
+        height: 300,
         frame: false,
         transparent: true, // window background transparent
         resizable: true,

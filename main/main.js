@@ -58,6 +58,81 @@ function createWindow() {
     mainWindow.loadFile(path.join(parentPathRenderer, 'renderer', 'index.html'));
 }
 
+let artistsWindow = null;
+
+function createArtistsWindow() {
+    const BrowserWindow = getBrowserWindow();
+    const path = getPath();
+
+    if(!BrowserWindow || !path) return;
+
+    if(artistsWindow && !artistsWindow.isDestroyed()) {
+        artistsWindow.focus();
+        return;
+    }
+
+    const parentPathPreload = path.dirname(__dirname);
+    const preloadPath = path.join(parentPathPreload, 'preload', 'preload.js');
+    const parentPathRenderer = path.dirname(__dirname);
+
+    artistsWindow = new BrowserWindow({
+        width: 480,
+        height: 400,
+        frame: false,
+        transparent: true,
+        resizable: false,
+        backgroundColor: '#00000000',
+        parent: mainWindow,
+        modal: false,
+        webPreferences: {
+            preload: preloadPath, // ✅ Added preload script
+            contextIsolation: true,
+            nodeIntegration: false,
+            enableRemoteModule: false,
+        }
+    });
+
+    artistsWindow.webContents.openDevTools(); // Optional: for debugging
+    artistsWindow.loadFile(path.join(parentPathRenderer, 'renderer', 'authors.html'));
+    artistsWindow.on('closed', () => {
+        artistsWindow = null;
+    });
+}
+
+function setupArtistsWindowIPC() {
+    const ipcMain = getIpcMain();
+    if(!ipcMain) return;
+
+    ipcMain.on('open-artists-window', () => {
+        createArtistsWindow();
+    });
+
+    ipcMain.on('close-artists-window', () => {
+        if (artistsWindow && !artistsWindow.isDestroyed()) {
+            artistsWindow.close();
+        }
+    });
+    ipcMain.on('get-artists', (event) => {
+        if (mainWindow && !mainWindow.isDestroyed()) {
+            mainWindow.webContents.send('request-artists-for-popup');
+        }
+    });
+
+    ipcMain.on('send-artists-to-popup', (event, artists) => {
+        if (artistsWindow && !artistsWindow.isDestroyed()) 
+            artistsWindow.webContents.send('receive-artists', artists);
+    });
+
+    ipcMain.on('artist-selected', (event, artist) => {
+        if (mainWindow && !mainWindow.isDestroyed()) {
+            mainWindow.webContents.send('artist-selected', artist);
+        }
+        if (artistsWindow && !artistsWindow.isDestroyed()) {
+            artistsWindow.close();
+        }
+    });
+}
+
 function isRaspberryPi() {
     const os = getOs();
     const fs = getFs();
@@ -393,6 +468,7 @@ function startApp() {
         createWindow();
         setupWindowControlIPC();
         setupFileHandlers();
+        setupArtistsWindowIPC();
         if (folder) {
             console.log('Starting watcher on:', folder);
             startWatching(folder, isRPi);

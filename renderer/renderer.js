@@ -9,44 +9,75 @@ const playBtn = document.getElementById('playBtn');
 
 let artistWindow = null;
 
-document.getElementById('authors').addEventListener('click', () => {
-  if(artistWindow && !artistWindow.closed) {
-    artistWindow.focus();
-    return;
-  }
+// Add this at the top of renderer.js after the variable declarations
+console.log('Renderer loaded, setting up artist handlers...');
 
-  artistWindow = window.open(
-    './authors.html',
-    'authorsWindow',
-    'width=480,height=300,resizable=yes'
-  );
+// document.getElementById('authors').addEventListener('click', () => {
+//   if(artistWindow && !artistWindow.closed) {
+//     artistWindow.focus();
+//     return;
+//   }
+
+//   window.electronAPI.openArtistsWindow();
+// });
+
+document.getElementById('authors').addEventListener('click', () => {
+  window.electronAPI.openArtistsWindow();
 });
 
-window.addEventListener('message', (event) => {
-  if(event.data.type === 'request-artists') {
-    if (artistWindow && !artistWindow.closed) {
-      const artists = [...new Set(allSongs.map(song => song.artist))]
-      artistWindow.postMessage({
-        type: 'artists',
-        artists: artists
-      }, '*');
-    }
-  } else if (event.data.type === 'artist-selected') {
-    const selectedArtist = event.data.artist;
-    currentFilter = selectedArtist;
-    currentSongs = getFilteredSongs();
-    console.log(`Filtered to artist: ${selectedArtist}, ${currentSongs.length} songs`);
+// window.addEventListener('message', (event) => {
+//   if(event.data.type === 'request-artists') {
+//     if (artistWindow && !artistWindow.closed) {
+//       const artists = [...new Set(allSongs.map(song => song.artist))]
+//       artistWindow.postMessage({
+//         type: 'artists',
+//         artists: artists
+//       }, '*');
+//     }
+//   } else if (event.data.type === 'artist-selected') {
+//     const selectedArtist = event.data.artist;
+//     currentFilter = selectedArtist;
+//     currentSongs = getFilteredSongs();
+//     console.log(`Filtered to artist: ${selectedArtist}, ${currentSongs.length} songs`);
 
-    currentIndex = -1;
-    audioPlayer.pause();
-    audioPlayer.src = '';
-    updatePlayIcon(false);
+//     currentIndex = -1;
+//     audioPlayer.pause();
+//     audioPlayer.src = '';
+//     updatePlayIcon(false);
 
-    if(selectedArtist === 'all') {
-      updateNowPlayingDisplayAdvanced('All Artist - Ready to play');
-    } else {
-      updateNowPlayingDisplayAdvanced(`${selectedArtist} - ${currentSongs.length} songs`);
-    }
+//     if(selectedArtist === 'all') {
+//       updateNowPlayingDisplayAdvanced('All Artist - Ready to play');
+//     } else {
+//       updateNowPlayingDisplayAdvanced(`${selectedArtist} - ${currentSongs.length} songs`);
+//     }
+//   }
+// });
+
+// Replace the existing onRequestArtists handler with this:
+window.electronAPI.onRequestArtists(() => {
+  console.log('Main window received request for artists');
+  console.log('All songs:', allSongs);
+  const artists = [...new Set(allSongs.map(song => song.artist))];
+  console.log('Extracted artists:', artists);
+  window.electronAPI.sendArtistsToPopup(artists);
+  console.log('Artists sent to popup');
+});
+
+// Handle artist selection from popup
+window.electronAPI.onArtistSelected((selectedArtist) => {
+  currentFilter = selectedArtist;
+  currentSongs = getFilteredSongs();
+  console.log(`Filtered to artist: ${selectedArtist}, ${currentSongs.length} songs`);
+
+  currentIndex = -1;
+  audioPlayer.pause();
+  audioPlayer.src = '';
+  updatePlayIcon(false);
+
+  if(selectedArtist === 'all') {
+    updateNowPlayingDisplayAdvanced('All Artist - Ready to play');
+  } else {
+    updateNowPlayingDisplayAdvanced(`${selectedArtist} - ${currentSongs.length} songs`);
   }
 });
 

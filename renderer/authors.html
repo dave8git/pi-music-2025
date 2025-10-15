@@ -58,7 +58,7 @@
         }
 
         .close-btn:hover {
-            background: #666;
+            background: #667;
         }
     </style>
 </head>
@@ -70,47 +70,27 @@
     </ul>
 
     <script>
-        const artistList = document.getElementById('artistList');
+        document.addEventListener('DOMContentLoaded', () => {
+            // Ask main process for artists
+            window.electronAPI.getArtists();
 
-        // Listen for artist data from parent window
-        window.addEventListener('message', (event) => {
-            if (event.data.type === 'artists') {
-                const artists = event.data.artists;
-                
-                // Clear existing list except "All Artists"
-                artistList.innerHTML = '<li class="artist-item" data-artist="all">All Artists</li>';
-                
-                // Add each artist
-                artists.forEach(artist => {
+            // When artists arrive, render them
+            window.electronAPI.onReceiveArtists((artists) => {
+                const list = document.getElementById('artistList');
+                list.innerHTML = ''; // Clear previous
+                artists.forEach(a => {
                     const li = document.createElement('li');
-                    li.className = 'artist-item';
-                    li.setAttribute('data-artist', artist);
-                    li.textContent = artist;
-                    artistList.appendChild(li);
-                });
-
-                // Add click handlers
-                document.querySelectorAll('.artist-item').forEach(item => {
-                    item.addEventListener('click', () => {
-                        const selectedArtist = item.getAttribute('data-artist');
-                        
-                        // Send selection back to parent
-                        window.opener.postMessage({
-                            type: 'artist-selected',
-                            artist: selectedArtist
-                        }, '*');
-                        
-                        // Close this window
-                        window.close();
+                    li.textContent = a;
+                    li.addEventListener('click', () => {
+                        window.electronAPI.selectArtist(a);
                     });
+                    list.appendChild(li);
                 });
-            }
+            });
         });
-
-        // Request artist data from parent
-        if (window.opener) {
-            window.opener.postMessage({ type: 'request-artists' }, '*');
-        }
     </script>
+
+    <ul id="artistList"></ul>
 </body>
+
 </html>

@@ -18,7 +18,7 @@ document.getElementById('authors').addEventListener('click', () => {
   artistWindow = window.open(
     './authors.html',
     'authorsWindow',
-    'width=480,height=320,resizable=yes'
+    'width=480,height=300,resizable=yes'
   );
 });
 

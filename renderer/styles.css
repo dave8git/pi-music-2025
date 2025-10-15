@@ -1,24 +1,26 @@
 /* General layout */
 body {
   margin: 0;
-  background: rgba(30, 30, 30, 0.95);
+  background: transparent;
   color: white;
   font-family: sans-serif;
   display: flex;
   justify-content: center;
   align-items: flex-start;
-  padding: 20px;
+  padding: 0;
+  overflow: hidden;
 }
 
 /* Main radio/player container */
 .radio {
   width: 100%;
-  max-width: 480px;
+  max-width: 520px;
   background: #1a1a1a;
   border-radius: 20px;
   box-shadow: 0 6px 16px rgba(0,0,0,0.6);
   overflow: hidden;
   padding: 20px;
+  margin: 0;
 }
 
 /* Title bar inside player */
@@ -188,4 +190,3 @@ body {
 .active {
   
 }
-

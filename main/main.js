@@ -44,7 +44,7 @@ function createWindow() {
         height: 300,
         frame: false,
         transparent: true, // window background transparent
-        resizable: true,
+        resizable: false,
         backgroundColor: '#00000000', // fully transparent
         webPreferences: {
             preload: preloadPath,

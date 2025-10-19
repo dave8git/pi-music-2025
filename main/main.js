@@ -74,6 +74,7 @@ function createArtistsWindow() {
     const parentPathPreload = path.dirname(__dirname);
     const preloadPath = path.join(parentPathPreload, 'preload', 'preload.js');
     const parentPathRenderer = path.dirname(__dirname);
+    const iconPath = path.join(__dirname, '..', 'assets', 'icon.png');
 
     artistsWindow = new BrowserWindow({
         width: 480,
@@ -84,6 +85,7 @@ function createArtistsWindow() {
         backgroundColor: '#00000000',
         parent: mainWindow,
         modal: false,
+        icon: iconPath,
         webPreferences: {
             preload: preloadPath, // ✅ Added preload script
             contextIsolation: true,

@@ -8,68 +8,187 @@
     <style>
         body {
             margin: 0;
-            background: #1a1a1a;
+            background: transparent;
             color: white;
             font-family: sans-serif;
-            padding: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            padding: 0;
+            overflow: hidden;
+        }
+
+        .artists-container {
+            width: 100%;
+            max-width: 320px;
+            max-height: 320px;
+            background: #1a1a1a;
+            border-radius: 20px;
+            box-shadow: 0 6px 16px rgba(0,0,0,0.6);
+            overflow: hidden;
+            padding: 15px;
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Title bar matching main player */
+        .title-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-weight: bold;
+            margin-bottom: 12px;
+            -webkit-app-region: drag;
+            flex-shrink: 0;
+        }
+
+        .title-bar .title {
+            font-size: 1.1rem;
+        }
+
+        .window-controls {
+            display: flex;
+            -webkit-app-region: no-drag;
+        }
+
+        .window-controls .btn {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background: transparent;
+            color: white;
+            border: none;
+            cursor: pointer;
+            font-size: 16px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            transition: background 0.2s;
+        }
+
+        .window-controls .btn:hover {
+            background: #444;
+        }
+
+        .window-controls .close:hover {
+            background: #c42b1c;
         }
 
         h2 {
             text-align: center;
-            margin-bottom: 20px;
+            margin-bottom: 12px;
+            font-size: 1rem;
+            color: #aaa;
+            flex-shrink: 0;
+        }
+
+        .artist-list-container {
+            flex: 1;
+            overflow-y: auto;
+            background: #222;
+            border-radius: 12px;
+            padding: 10px;
         }
 
         .artist-list {
             list-style: none;
             padding: 0;
             margin: 0;
-            max-height: 400px;
-            overflow-y: auto;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            justify-content: flex-start;
         }
 
         .artist-item {
-            padding: 15px;
+            padding: 10px 16px;
             background: #2a2a2a;
-            margin-bottom: 8px;
-            border-radius: 8px;
+            border-radius: 20px;
             cursor: pointer;
-            transition: background 0.2s;
+            transition: background 0.2s, transform 0.1s;
+            font-size: 0.9rem;
+            white-space: nowrap;
+            border: 2px solid transparent;
+        }
+
+        /* Smaller bubbles when there are many artists */
+        .artist-list.many-artists .artist-item {
+            padding: 6px 12px;
+            font-size: 0.8rem;
+            border-radius: 16px;
+        }
+
+        .artist-list.lots-of-artists .artist-item {
+            padding: 5px 10px;
+            font-size: 0.75rem;
+            border-radius: 14px;
         }
 
         .artist-item:hover {
             background: #3a3a3a;
+            transform: translateY(-2px);
         }
 
         .artist-item.selected {
             background: #1db954;
+            border-color: #1db954;
         }
 
-        .close-btn {
-            position: fixed;
-            bottom: 20px;
-            right: 20px;
+        .artist-item[data-artist="all"] {
             background: #444;
-            border: none;
-            color: white;
-            padding: 12px 24px;
-            border-radius: 8px;
-            cursor: pointer;
-            font-size: 1rem;
+            font-weight: bold;
         }
 
-        .close-btn:hover {
-            background: #667;
+        .artist-item[data-artist="all"]:hover {
+            background: #555;
+        }
+
+        /* Scrollbar styling to match main player */
+        .artist-list-container::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .artist-list-container::-webkit-scrollbar-track {
+            background: #1a1a1a;
+            border-radius: 12px;
+        }
+
+        .artist-list-container::-webkit-scrollbar-thumb {
+            background: #444;
+            border-radius: 12px;
+        }
+
+        .artist-list-container::-webkit-scrollbar-thumb:hover {
+            background: #666;
         }
     </style>
 </head>
 
 <body>
-    <h2>Select Artist</h2>
-    <ul id="artistList" class="artist-list">
-        <li class="artist-item" data-artist="all">All Artists</li>
-    </ul>
+    <div class="artists-container">
+        <div class="title-bar" id="titlebar">
+            <span class="title">Select Artist</span>
+            <div class="window-controls">
+                <button id="close-btn" class="btn close">✕</button>
+            </div>
+        </div>
+
+        <h2>Filter by Artist</h2>
+
+        <div class="artist-list-container">
+            <ul id="artistList" class="artist-list">
+                <li class="artist-item" data-artist="all">All Artists</li>
+            </ul>
+        </div>
+    </div>
 
     <script>
+        // Close button handler
+        document.getElementById('close-btn').addEventListener('click', () => {
+            window.electronAPI.closeArtistsWindow();
+        });
+
         document.addEventListener('DOMContentLoaded', () => {
             // Ask main process for artists
             window.electronAPI.getArtists();
@@ -77,20 +196,44 @@
             // When artists arrive, render them
             window.electronAPI.onReceiveArtists((artists) => {
                 const list = document.getElementById('artistList');
-                list.innerHTML = ''; // Clear previous
+                
+                // Keep "All Artists" option and add the rest
+                const allArtistsItem = list.querySelector('[data-artist="all"]');
+                list.innerHTML = '';
+                
+                if (allArtistsItem) {
+                    list.appendChild(allArtistsItem);
+                }
+
                 artists.forEach(a => {
                     const li = document.createElement('li');
+                    li.className = 'artist-item';
                     li.textContent = a;
+                    li.setAttribute('data-artist', a);
                     li.addEventListener('click', () => {
                         window.electronAPI.selectArtist(a);
                     });
                     list.appendChild(li);
                 });
+
+                // Apply size class based on number of artists
+                list.classList.remove('many-artists', 'lots-of-artists');
+                if (artists.length > 15) {
+                    list.classList.add('lots-of-artists');
+                } else if (artists.length > 8) {
+                    list.classList.add('many-artists');
+                }
             });
+
+            // Add click handler for "All Artists"
+            const allArtistsItem = document.querySelector('[data-artist="all"]');
+            if (allArtistsItem) {
+                allArtistsItem.addEventListener('click', () => {
+                    window.electronAPI.selectArtist('all');
+                });
+            }
         });
     </script>
-
-    <ul id="artistList"></ul>
 </body>
 
 </html>

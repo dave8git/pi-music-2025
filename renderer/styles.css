@@ -66,6 +66,27 @@ body {
   text-align: center;
   margin-bottom: 15px;
   font-size: 1rem;
+  overflow: hidden;
+  position: relative;
+  white-space: nowrap;
+}
+
+.display .scrolling-text {
+  display: inline-block;
+  white-space: nowrap;
+}
+
+.display.should-scroll .scrolling-text {
+  animation: scrollText 15s linear infinite;
+}
+
+@keyframes scrollText {
+  0% {
+    transform: translateX(100%);
+  }
+  100% {
+    transform: translateX(-100%);
+  }
 }
 
 /* Utility buttons */

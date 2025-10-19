@@ -250,13 +250,9 @@ function togglePlayPause() {
   if (currentSongs.length === 0) return;
   if (isLoadingSong) return;
 
-  // If no song is loaded yet, start playing the first song
-  if (!audioPlayer.src || audioPlayer.src === '') {
-    if (currentIndex >= 0 && currentIndex < currentSongs.length) {
-      playSong(currentIndex)
-    } else {
-      playSong(0);
-    }
+  // If no song is loaded yet OR currentIndex is -1, start playing the first song
+  if (!audioPlayer.src || audioPlayer.src === '' || currentIndex === -1) {
+    playSong(0);
     return;
   }
   // If there's a song loaded, toggle play/pause

@@ -64,9 +64,9 @@ function createArtistsWindow() {
     const BrowserWindow = getBrowserWindow();
     const path = getPath();
 
-    if(!BrowserWindow || !path) return;
+    if (!BrowserWindow || !path) return;
 
-    if(artistsWindow && !artistsWindow.isDestroyed()) {
+    if (artistsWindow && !artistsWindow.isDestroyed()) {
         artistsWindow.focus();
         return;
     }
@@ -101,7 +101,7 @@ function createArtistsWindow() {
 
 function setupArtistsWindowIPC() {
     const ipcMain = getIpcMain();
-    if(!ipcMain) return;
+    if (!ipcMain) return;
 
     ipcMain.on('open-artists-window', () => {
         createArtistsWindow();
@@ -119,7 +119,7 @@ function setupArtistsWindowIPC() {
     });
 
     ipcMain.on('send-artists-to-popup', (event, artists) => {
-        if (artistsWindow && !artistsWindow.isDestroyed()) 
+        if (artistsWindow && !artistsWindow.isDestroyed())
             artistsWindow.webContents.send('receive-artists', artists);
     });
 
@@ -217,7 +217,7 @@ async function musicLocation() {
             fs.mkdirSync(documentsPath, { recursive: true });
             console.log('Created music folder at:', documentsPath);
             selectedFolder = documentsPath;
-            
+
             // Show message to user
             if (mainWindow && !mainWindow.isDestroyed()) {
                 mainWindow.webContents.send('show-folder-message', documentsPath);
@@ -331,11 +331,11 @@ function setupFileHandlers() {
         const fs = getFs();
         const path = getPath();
 
-        if(!mainWindow) return []; // musimy sprawdzić czy mainWindow istnieje, jeżeli nie to nie pokaże też dialogu
+        if (!mainWindow) return []; // musimy sprawdzić czy mainWindow istnieje, jeżeli nie to nie pokaże też dialogu
 
         const result = await dialog.showOpenDialog(mainWindow, { // result będzie obiektem i będzie miało dwie właściwości: canceled oraz filePaths.
             properties: ['openFile', 'multiSelections'],
-            filters: [{ name: 'MP3 Files', extensions: ['mp3']}],
+            filters: [{ name: 'MP3 Files', extensions: ['mp3'] }],
         });
 
         if (result.canceled) return [];
@@ -345,12 +345,12 @@ function setupFileHandlers() {
         for (let i = 0; i < result.filePaths.length; i += batchSize) {
             const batch = result.filePaths.slice(i, i + batchSize);
 
-            for(const filePath of batch) {
+            for (const filePath of batch) {
                 try {
                     const fileName = path.basename(filePath);
                     const destinationPath = path.join(MUSIC_FOLDER, fileName);
 
-                    if(fs.existsSync(destinationPath)) {
+                    if (fs.existsSync(destinationPath)) {
                         console.log(`File ${fileName} already exists, skipping`);
                         continue;
                     }
@@ -364,7 +364,7 @@ function setupFileHandlers() {
                 }
             }
 
-            if(i + batchSize < result.filePaths.length) { // wstawia niewielkie przerwy pomiedzy batchami
+            if (i + batchSize < result.filePaths.length) { // wstawia niewielkie przerwy pomiedzy batchami
                 await new Promise(resolve => setTimeout(resolve, 10));
             }
         }
@@ -448,6 +448,36 @@ function setupFileHandlers() {
         } catch (error) {
             console.error('❌ Error loading audio:', error);
             throw error;
+        }
+    });
+
+    ipcMain.handle('delete-song', async (_, fileUrl) => {
+        const fs = getFs();
+        const path = getPath();
+        const fileURLToPath = getFileURLToPath();
+        try {
+            const filePath = fileURLToPath(fileUrl);
+            const fileName = path.basename(filePath);
+            console.log('🗑️ Attempting to delete:', fileName);
+
+            // Check if file exists
+            if (!fs.existsSync(filePath)) {
+                console.error('File does not exists:', filePath);
+                return { success: false, error: 'File not found' };
+            }
+
+            // Delete the file
+            await fs.promises.unlink(filePath);
+            console.log('✅ Successfully deleted:', fileName);
+
+            // Clear from caches
+            metadataCache.delete(fileName);
+            audioCache.delete(filePath);
+
+            return { success: true }
+        } catch (error) {
+            console.error('❌ Error deleting song:', error);
+            return { success: false, error: error.message };
         }
     });
 }

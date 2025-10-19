@@ -12,14 +12,14 @@ contextBridge.exposeInMainWorld('electronAPI', {
     loadAllFiles: () => ipcRenderer.invoke('load-all-files'),
     loadAudio: (fileUrl) => ipcRenderer.invoke('load-audio', fileUrl),
     uploadMp3Files: () => ipcRenderer.invoke('upload-mp3-files'),
-    
+     
     // Artists window methods
     openArtistsWindow: () => ipcRenderer.send('open-artists-window'),
     closeArtistsWindow: () => ipcRenderer.send('close-artists-window'),
     getArtists: () => ipcRenderer.send('get-artists'),
     sendArtistsToPopup: (artists) => ipcRenderer.send('send-artists-to-popup', artists),
     selectArtist: (artist) => ipcRenderer.send('artist-selected', artist),
-
+    deleteSong: (filePath) => ipcRenderer.invoke('delete-song', filePath),
     // Listeners
     onRequestArtists: (callback) => {
         ipcRenderer.on('request-artists-for-popup', () => callback());

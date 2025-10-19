@@ -53,7 +53,7 @@ function createWindow() {
             enableRemoteModule: false
         }
     });
-    mainWindow.webContents.openDevTools();
+    //mainWindow.webContents.openDevTools();
     const parentPathRenderer = path.dirname(__dirname); // parentPath will be parent of /main directory so, root directory. 
     mainWindow.loadFile(path.join(parentPathRenderer, 'renderer', 'index.html'));
 }
@@ -92,7 +92,7 @@ function createArtistsWindow() {
         }
     });
 
-    artistsWindow.webContents.openDevTools(); // Optional: for debugging
+    //artistsWindow.webContents.openDevTools();
     artistsWindow.loadFile(path.join(parentPathRenderer, 'renderer', 'authors.html'));
     artistsWindow.on('closed', () => {
         artistsWindow = null;
@@ -198,38 +198,34 @@ async function musicLocation() {
     const fs = getFs();
     const path = getPath();
     const os = getOs();
-    const dialog = getDialog();
 
-    if (!fs || !path || !os || !dialog) {
+    if (!fs || !path || !os) {
         console.error('Required modules missing!');
         return null;
     }
 
     const homeDir = os.homedir();
-    const homePath = path.join(homeDir, 'Downloads', 'music_folder');
+    const documentsPath = path.join(homeDir, 'Documents', 'music_folder');
 
     try {
-        if (fs.existsSync(homePath) && fs.lstatSync(homePath).isDirectory()) {
-            if (await musicFilesExists(homePath)) { // await rozwiązuje obietnicę
-                selectedFolder = homePath;
-            }
+        // Check if music_folder exists in Documents
+        if (fs.existsSync(documentsPath) && fs.lstatSync(documentsPath).isDirectory()) {
+            console.log('Music folder found at:', documentsPath);
+            selectedFolder = documentsPath;
         } else {
-            const result = await dialog.showOpenDialog(mainWindow, { // otwiera okno i pozwala wybrać katalog
-                properties: ['openDirectory'],
-            });
-            if (!result.canceled && result.filePaths.length > 0) {
-                const chosenPath = result.filePaths[0];
-                if (await musicFilesExists(chosenPath)) {
-                    selectedFolder = chosenPath;
-                } else {
-                    const newFolderName = path.join(chosenPath, 'music_folder');
-                    fs.mkdirSync(newFolderName, { recursive: true });
-                    selectedFolder = chosenPath;
-                }
+            // Create the folder if it doesn't exist
+            fs.mkdirSync(documentsPath, { recursive: true });
+            console.log('Created music folder at:', documentsPath);
+            selectedFolder = documentsPath;
+            
+            // Show message to user
+            if (mainWindow && !mainWindow.isDestroyed()) {
+                mainWindow.webContents.send('show-folder-message', documentsPath);
             }
         }
     } catch (err) {
-        console.log('Error selecting music folder:', err);
+        console.log('Error with music folder:', err);
+        return null;
     }
     return selectedFolder;
 }

@@ -239,7 +239,11 @@ function togglePlayPause() {
 
   // If no song is loaded yet, start playing the first song
   if (!audioPlayer.src || audioPlayer.src === '') {
-    playSong(0);
+    if (currentIndex >= 0 && currentIndex < currentSongs.length) {
+      playSong(currentIndex)
+    } else {
+      playSong(0);
+    }
     return;
   }
 
@@ -299,9 +303,12 @@ function showStatus(message, type) {
   uploadStatus.className = `status ${type}`;
   uploadStatus.style.display = 'block';
 
+  // Show longer for info messages about folder creation
+  const duration = type === 'info' ? 5000 : 3000;
+
   setTimeout(() => {
     uploadStatus.style.display = 'none';
-  }, 3000);
+  }, duration);
 }
 
 function debounceResize() {
@@ -363,6 +370,12 @@ window.electronAPI.onMusicEvents((events) => {
     }
   });
   loadAllFiles();
+});
+
+window.electronAPI.onFolderMessage((folderPath) => {
+  const message = `Music folder created at:\n${folderPath}\n\nPlease add your MP3 files to this folder.`;
+  showStatus(message, 'info');
+  console.log('📁 Music folder location:', folderPath);
 });
 
 document.addEventListener('DOMContentLoaded', () => {

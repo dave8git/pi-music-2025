@@ -16,8 +16,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     // Artists window methods
     openArtistsWindow: () => ipcRenderer.send('open-artists-window'),
     closeArtistsWindow: () => ipcRenderer.send('close-artists-window'),
-    getArtists: () => ipcRenderer.send('get-artists'), // ✅ Fixed - just send the signal
-    sendArtistsToPopup: (artists) => ipcRenderer.send('send-artists-to-popup', artists), // ✅ This sends the actual artists
+    getArtists: () => ipcRenderer.send('get-artists'),
+    sendArtistsToPopup: (artists) => ipcRenderer.send('send-artists-to-popup', artists),
     selectArtist: (artist) => ipcRenderer.send('artist-selected', artist),
 
     // Listeners
@@ -29,6 +29,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
     },
     onArtistSelected: (callback) => {
         ipcRenderer.on('artist-selected', (event, artist) => callback(artist));
+    },
+    onFolderMessage: (callback) => {
+        ipcRenderer.on('show-folder-message', (event, folderPath) => callback(folderPath));
     }
 });
 
